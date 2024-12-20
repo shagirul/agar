@@ -63,34 +63,90 @@ const CircleCanvasTwo = () => {
       }))
     );
   };
+
+  // const moveCirclesTowards = (mouseX, mouseY) => {
+  //   setCircles((prevCircles) =>
+  //     prevCircles.map((circle) => {
+  //       const dx = mouseX - circle.x;
+  //       const dy = mouseY - circle.y;
+  //       const distance = Math.sqrt(dx * dx + dy * dy);
+
+  //       const maxSpeed = 7;
+  //       const minSpeed = 1;
+  //       const sizeFactor = 15;
+  //       // const speed = Math.max(minSpeed, maxSpeed - circle.size / sizeFactor);
+  //       // Speed limit based on circle size
+  //       const sizeBasedSpeed = Math.max(
+  //         minSpeed,
+  //         maxSpeed - circle.size / sizeFactor
+  //       );
+
+  //       // Ease-out effect: reduce speed as it gets closer to the target (mouse)
+  //       const easingFactor = Math.pow(distance, 0.5); // Ease-out based on distance
+  //       const speed = Math.min(sizeBasedSpeed, easingFactor);
+
+  //       if (distance < 1) return circle;
+
+  //       const angle = Math.atan2(dy, dx);
+  //       return {
+  //         ...circle,
+  //         x: circle.x + Math.cos(angle) * Math.min(speed, distance),
+  //         y: circle.y + Math.sin(angle) * Math.min(speed, distance),
+  //       };
+  //     })
+  //   );
+
+  //   checkForMerges();
+  // };
+
   const moveCirclesTowards = (mouseX, mouseY) => {
     setCircles((prevCircles) =>
-      prevCircles.map((circle) => {
+      prevCircles.map((circle, index) => {
         const dx = mouseX - circle.x;
         const dy = mouseY - circle.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        const maxSpeed = 10;
+        const maxSpeed = 7;
         const minSpeed = 1;
-        const sizeFactor = 40;
+        const sizeFactor = 15;
 
-        // Speed limit based on circle size
         const sizeBasedSpeed = Math.max(
           minSpeed,
           maxSpeed - circle.size / sizeFactor
         );
-
-        // Ease-out effect: reduce speed as it gets closer to the target (mouse)
         const easingFactor = Math.pow(distance, 0.5); // Ease-out based on distance
         const speed = Math.min(sizeBasedSpeed, easingFactor);
 
-        if (distance < 1) return circle; // If the distance is too small, stop the movement
+        if (distance < 1) return circle;
 
         const angle = Math.atan2(dy, dx);
+        let newX = circle.x + Math.cos(angle) * Math.min(speed, distance);
+        let newY = circle.y + Math.sin(angle) * Math.min(speed, distance);
+
+        // Ensure no overlap between circles
+        prevCircles.forEach((otherCircle, otherIndex) => {
+          if (index !== otherIndex) {
+            const dx = newX - otherCircle.x;
+            const dy = newY - otherCircle.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = circle.size + otherCircle.size + 2; // Minimum space between circles
+
+            // If the circles are too close, move them apart
+            if (dist < minDistance) {
+              const angle = Math.atan2(dy, dx);
+              const offset = minDistance - dist;
+
+              // Push circles apart
+              newX += (Math.cos(angle) * offset) / 2;
+              newY += (Math.sin(angle) * offset) / 2;
+            }
+          }
+        });
+
         return {
           ...circle,
-          x: circle.x + Math.cos(angle) * Math.min(speed, distance),
-          y: circle.y + Math.sin(angle) * Math.min(speed, distance),
+          x: newX,
+          y: newY,
         };
       })
     );
@@ -98,6 +154,66 @@ const CircleCanvasTwo = () => {
     checkForMerges();
   };
 
+  // const checkForMerges = () => {
+  //   setCircles((prevCircles) => {
+  //     const merged = [];
+
+  //     for (let i = 0; i < prevCircles.length; i++) {
+  //       let mergedCircle = prevCircles[i];
+
+  //       for (let j = i + 1; j < prevCircles.length; j++) {
+  //         const circle1 = mergedCircle;
+  //         const circle2 = prevCircles[j];
+
+  //         const dx = circle2.x - circle1.x;
+  //         const dy = circle2.y - circle1.y;
+  //         const distance = Math.sqrt(dx * dx + dy * dy);
+
+  //         // Check if both circles are ready to merge (cooldown must be zero)
+  //         if (
+  //           distance < circle1.size + circle2.size &&
+  //           circle1.cooldown <= 0 &&
+  //           circle2.cooldown <= 0
+  //         ) {
+  //           // Merge the circles
+  //           mergedCircle = {
+  //             x: (circle1.x + circle2.x) / 2,
+  //             y: (circle1.y + circle2.y) / 2,
+  //             size: circle1.size + circle2.size,
+  //             cooldown: Math.max(10, 30 + 0.02 * (circle1.size + circle2.size)), // Ensure cooldown is at least 10 sec
+  //           };
+
+  //           prevCircles.splice(j, 1); // Remove merged circle
+  //         }
+  //       }
+
+  //       merged.push(mergedCircle);
+  //     }
+
+  //     // Ensure no overlap after merge (check distances)
+  //     for (let i = 0; i < merged.length; i++) {
+  //       for (let j = i + 1; j < merged.length; j++) {
+  //         const dx = merged[j].x - merged[i].x;
+  //         const dy = merged[j].y - merged[i].y;
+  //         const distance = Math.sqrt(dx * dx + dy * dy);
+  //         const minDistance = merged[i].size + merged[j].size + 10; // minimum space between merged circles
+
+  //         // If they are too close, push them apart
+  //         if (distance < minDistance) {
+  //           const angle = Math.atan2(dy, dx);
+  //           const offset = minDistance - distance;
+
+  //           merged[j].x += (Math.cos(angle) * offset) / 2;
+  //           merged[j].y += (Math.sin(angle) * offset) / 2;
+  //           merged[i].x -= (Math.cos(angle) * offset) / 2;
+  //           merged[i].y -= (Math.sin(angle) * offset) / 2;
+  //         }
+  //       }
+  //     }
+
+  //     return merged;
+  //   });
+  // };
   const checkForMerges = () => {
     setCircles((prevCircles) => {
       const merged = [];
@@ -115,20 +231,20 @@ const CircleCanvasTwo = () => {
 
           // Check if both circles are ready to merge (cooldown must be zero)
           if (
-            distance < circle1.size + circle2.size &&
+            distance < circle1.size + circle2.size + 5 && // Added small buffer
             circle1.cooldown <= 0 &&
             circle2.cooldown <= 0
           ) {
-            // Merge the circles without affecting cooldown
+            // Merge the circles
             mergedCircle = {
               x: (circle1.x + circle2.x) / 2,
               y: (circle1.y + circle2.y) / 2,
               size: circle1.size + circle2.size,
-              cooldown:
-                circle1.cooldown > 0 ? circle1.cooldown : circle2.cooldown, // Keep the cooldown from one of the circles (no change)
+              cooldown: 0, // Set cooldown to 0 for the new merged circle
             };
 
             prevCircles.splice(j, 1); // Remove merged circle
+            break; // Stop checking for further merges once merged
           }
         }
 
