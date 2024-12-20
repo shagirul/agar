@@ -63,7 +63,6 @@ const CircleCanvasTwo = () => {
       }))
     );
   };
-
   const moveCirclesTowards = (mouseX, mouseY) => {
     setCircles((prevCircles) =>
       prevCircles.map((circle) => {
@@ -74,9 +73,18 @@ const CircleCanvasTwo = () => {
         const maxSpeed = 10;
         const minSpeed = 1;
         const sizeFactor = 40;
-        const speed = Math.max(minSpeed, maxSpeed - circle.size / sizeFactor);
 
-        if (distance < 1) return circle;
+        // Speed limit based on circle size
+        const sizeBasedSpeed = Math.max(
+          minSpeed,
+          maxSpeed - circle.size / sizeFactor
+        );
+
+        // Ease-out effect: reduce speed as it gets closer to the target (mouse)
+        const easingFactor = Math.pow(distance, 0.5); // Ease-out based on distance
+        const speed = Math.min(sizeBasedSpeed, easingFactor);
+
+        if (distance < 1) return circle; // If the distance is too small, stop the movement
 
         const angle = Math.atan2(dy, dx);
         return {
