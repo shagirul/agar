@@ -59,7 +59,7 @@ const CircleCanvasTwo = () => {
     setCircles((prevCircles) =>
       prevCircles.map((circle) => ({
         ...circle,
-        cooldown: Math.max(0, circle.cooldown - 1 / 60), // Decrease cooldown (1 frame = 1/60 sec)
+        cooldown: Math.max(0, circle.cooldown - 1 / 9000), // Decrease cooldown (1 frame = 1/60 sec)
       }))
     );
   };
@@ -166,7 +166,8 @@ const CircleCanvasTwo = () => {
               ? {
                   ...c,
                   size: c.size + 5,
-                  cooldown: Math.max(10, 30 + 0.2 * c.size), // Set cooldown after growth with min 10 sec
+                  // Decrease the cooldown by 4 seconds but ensure it's not less than 0
+                  cooldown: Math.max(0, c.cooldown - 4),
                 }
               : c
           )
