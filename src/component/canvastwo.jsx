@@ -2,22 +2,22 @@ import React, { useRef, useEffect, useState } from "react";
 
 const CircleCanvasTwo = () => {
   const canvasRef = useRef(null);
-  const speedRef = useRef(10); // useRef for speed instead of useState
-  const [circlePosition, setCirclePosition] = useState({
-    x: window.innerWidth / 2,
-    y: window.innerHeight / 2,
-  });
+  const [circles, setCircles] = useState([
+    {
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+      size: 20, // Circle size
+    },
+  ]);
   const [applePosition, setApplePosition] = useState({
     x: Math.floor(Math.random() * window.innerWidth),
     y: Math.floor(Math.random() * window.innerHeight),
   });
-  const [isAppleVisible, setIsAppleVisible] = useState(true); // Track apple visibility
-  const [circleSize, setCircleSize] = useState(20);
+  const [isAppleVisible, setIsAppleVisible] = useState(true);
 
-  let animationFrameId; // Declare the animation frame ID
+  let animationFrameId;
 
-  const drawCircle = (ctx, x, y) => {
-    // Clear the canvas
+  const drawCircles = (ctx) => {
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
     // Draw the border
@@ -28,63 +28,102 @@ const CircleCanvasTwo = () => {
     ctx.stroke();
     ctx.closePath();
 
-    // Draw the main circle
-    ctx.beginPath();
-    ctx.arc(x, y, circleSize, 0, Math.PI * 2);
-    ctx.fillStyle = "blue";
-    ctx.fill();
-    ctx.closePath();
+    // Draw all circles
+    circles.forEach((circle) => {
+      ctx.beginPath();
+      ctx.arc(circle.x, circle.y, circle.size, 0, Math.PI * 2);
+      ctx.fillStyle = "blue";
+      ctx.fill();
+      ctx.closePath();
+    });
+
+    // Draw the apple if visible
+    if (isAppleVisible) {
+      ctx.beginPath();
+      ctx.arc(applePosition.x, applePosition.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = "red";
+      ctx.fill();
+      ctx.closePath();
+    }
   };
 
-  const moveCircleTowards = (mouseX, mouseY) => {
-    setCirclePosition((prev) => {
-      const dx = mouseX - prev.x;
-      const dy = mouseY - prev.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+  const moveCirclesTowards = (mouseX, mouseY) => {
+    const buffer = 5; // Extra buffer to prevent visual overlap
 
-      // Use the speed stored in the ref directly
-      const updatedSpeed = Math.min(
-        distance / (10 + Math.pow(circleSize, 1.5) / 100),
-        speedRef.current
-      );
-      console.log(updatedSpeed); // Log current speed
-      if (distance < 1) return prev; // Stop moving when very close
+    setCircles((prevCircles) => {
+      const updatedCircles = prevCircles.map((circle) => {
+        const dx = mouseX - circle.x;
+        const dy = mouseY - circle.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-      const angle = Math.atan2(dy, dx);
-      return {
-        x: prev.x + Math.cos(angle) * updatedSpeed,
-        y: prev.y + Math.sin(angle) * updatedSpeed,
-      };
+        // Calculate speed based on circle size
+        const maxSpeed = 10;
+        const minSpeed = 1;
+        const sizeFactor = 40;
+        const speed = Math.max(minSpeed, maxSpeed - circle.size / sizeFactor);
+
+        if (distance < 1) return circle;
+
+        const angle = Math.atan2(dy, dx);
+        return {
+          ...circle,
+          x: circle.x + Math.cos(angle) * Math.min(speed, distance),
+          y: circle.y + Math.sin(angle) * Math.min(speed, distance),
+        };
+      });
+
+      // Apply dynamic offset to avoid overlapping
+      for (let i = 0; i < updatedCircles.length; i++) {
+        for (let j = i + 1; j < updatedCircles.length; j++) {
+          const dx = updatedCircles[j].x - updatedCircles[i].x;
+          const dy = updatedCircles[j].y - updatedCircles[i].y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          // Calculate dynamic offset based on sizes
+          const dynamicOffset =
+            updatedCircles[i].size + updatedCircles[j].size + buffer;
+
+          if (distance < dynamicOffset) {
+            const overlap = dynamicOffset - distance;
+            const angle = Math.atan2(dy, dx);
+
+            // Push the circles away from each other
+            updatedCircles[i].x -= (Math.cos(angle) * overlap) / 2;
+            updatedCircles[i].y -= (Math.sin(angle) * overlap) / 2;
+            updatedCircles[j].x += (Math.cos(angle) * overlap) / 2;
+            updatedCircles[j].y += (Math.sin(angle) * overlap) / 2;
+          }
+        }
+      }
+
+      return updatedCircles;
     });
   };
 
   const detectCollision = () => {
-    const dx = circlePosition.x - applePosition.x;
-    const dy = circlePosition.y - applePosition.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    circles.forEach((circle, index) => {
+      const dx = circle.x - applePosition.x;
+      const dy = circle.y - applePosition.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-    if (distance < circleSize + 10 && isAppleVisible) {
-      console.log("collision detected");
+      if (distance < circle.size + 10 && isAppleVisible) {
+        setIsAppleVisible(false);
 
-      // Hide the apple immediately
-      setIsAppleVisible(false);
+        // Increase the size of the first circle that collides
+        setCircles((prev) =>
+          prev.map((c, i) => (i === index ? { ...c, size: c.size + 5 } : c))
+        );
 
-      // Increase the circle size
-      setCircleSize((prev) => prev + 5);
-
-      // Decrease the speed using the ref
-      speedRef.current = Math.max(speedRef.current - 1, 1); // Ensure the speed doesn't go below 1
-
-      // Respawn the apple after a short delay
-      setTimeout(() => {
-        const newApplePosition = {
-          x: Math.floor(Math.random() * window.innerWidth),
-          y: Math.floor(Math.random() * window.innerHeight),
-        };
-        setApplePosition(newApplePosition);
-        setIsAppleVisible(true); // Make the apple visible again
-      }, 500); // Delay for respawning (500ms)
-    }
+        setTimeout(() => {
+          const newApplePosition = {
+            x: Math.floor(Math.random() * window.innerWidth),
+            y: Math.floor(Math.random() * window.innerHeight),
+          };
+          setApplePosition(newApplePosition);
+          setIsAppleVisible(true);
+        }, 500);
+      }
+    });
   };
 
   const handleMouseMove = (e) => {
@@ -94,11 +133,38 @@ const CircleCanvasTwo = () => {
     const mouseY = e.clientY - rect.top;
 
     const animate = () => {
-      moveCircleTowards(mouseX, mouseY);
+      moveCirclesTowards(mouseX, mouseY);
       animationFrameId = requestAnimationFrame(animate);
     };
     cancelAnimationFrame(animationFrameId);
     animationFrameId = requestAnimationFrame(animate);
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.code === "Space") {
+      setCircles((prevCircles) => {
+        return prevCircles.flatMap((circle) => {
+          const halfSize = circle.size / 2;
+          const offset = circle.size + 15;
+          if (halfSize < 5) return [circle];
+
+          return [
+            {
+              ...circle,
+              size: halfSize,
+              x: circle.x - offset,
+              y: circle.y - offset,
+            },
+            {
+              ...circle,
+              size: halfSize,
+              x: circle.x + offset,
+              y: circle.y + offset,
+            },
+          ];
+        });
+      });
+    }
   };
 
   useEffect(() => {
@@ -108,34 +174,23 @@ const CircleCanvasTwo = () => {
     canvas.height = window.innerHeight;
 
     const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawCircle(ctx, circlePosition.x, circlePosition.y);
-
-      // Draw the apple if it's visible
-      if (isAppleVisible) {
-        ctx.beginPath();
-        ctx.arc(applePosition.x, applePosition.y, 10, 0, Math.PI * 2); // Draw apple with fixed size
-        ctx.fillStyle = "red";
-        ctx.fill();
-        ctx.closePath();
-      }
-
-      // Detect collision
+      drawCircles(ctx);
       detectCollision();
-      // Continue the animation loop
       animationFrameId = requestAnimationFrame(render);
     };
     render();
 
     return () => cancelAnimationFrame(animationFrameId);
-  }, [circlePosition, applePosition, isAppleVisible, circleSize]);
+  }, [circles, applePosition, isAppleVisible]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     canvas.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("keydown", handleKeyPress);
 
     return () => {
       canvas.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("keydown", handleKeyPress);
     };
   }, []);
 
