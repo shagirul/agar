@@ -111,12 +111,13 @@ const CircleCanvasTwo = () => {
             circle1.cooldown <= 0 &&
             circle2.cooldown <= 0
           ) {
-            // Merge the circles
+            // Merge the circles without affecting cooldown
             mergedCircle = {
               x: (circle1.x + circle2.x) / 2,
               y: (circle1.y + circle2.y) / 2,
               size: circle1.size + circle2.size,
-              cooldown: Math.max(10, 30 + 0.02 * (circle1.size + circle2.size)), // Ensure cooldown is at least 10 sec
+              cooldown:
+                circle1.cooldown > 0 ? circle1.cooldown : circle2.cooldown, // Keep the cooldown from one of the circles (no change)
             };
 
             prevCircles.splice(j, 1); // Remove merged circle
