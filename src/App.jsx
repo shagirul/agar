@@ -1,13 +1,12 @@
 import "./App.css";
-import CircleCanvasTWO from "./component/canvastwo";
-
-// import CircleCanvas from "./component/canvas";
-// import CircleCanvasTWO from "./component/canvastwo";
+import CircleCanvasTwo from "./component/canvastwo";
+import Game from "./page/game";
 
 function App() {
   return (
     <>
-      <CircleCanvasTWO />
+      <Game />
+      {/* <CircleCanvasTwo /> */}
     </>
   );
 }
