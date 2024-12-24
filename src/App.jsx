@@ -1,5 +1,5 @@
 import "./App.css";
-import CircleCanvasTwo from "./component/canvastwo";
+// import CircleCanvasTwo from "./component/canvastwo";
 import Game from "./page/game";
 
 function App() {
