@@ -1,295 +1,307 @@
-// import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState } from "react";
+import { io } from "socket.io-client";
 
-// const CircleCanvasTwo = () => {
-//   const canvasRef = useRef(null);
-//   const [circles, setCircles] = useState([
-//     {
-//       x: window.innerWidth / 2,
-//       y: window.innerHeight / 2,
-//       size: 20, // Circle size
-//       cooldown: 0, // Cooldown timer in seconds
-//     },
-//   ]);
-//   const [applePosition, setApplePosition] = useState({
-//     x: Math.floor(Math.random() * window.innerWidth),
-//     y: Math.floor(Math.random() * window.innerHeight),
-//   });
-//   const [isAppleVisible, setIsAppleVisible] = useState(true);
+const SocketEvents = Object.freeze({
+  Connection: "connection",
+  PlayerCreated: "playerCreated",
+  CreatePlayer: "createPlayer",
+  UpdatePlayerPosition: "updatePlayerPosition",
+  GameState: "gameState",
+  PlayerDisconnected: "playerDisconnected",
+});
 
-//   let animationFrameId;
+const socket = io("http://localhost:3000");
 
-//   const drawCircles = (ctx) => {
-//     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+const CircleCanvasTwo = () => {
+  const canvasRef = useRef(null);
+  const [circles, setCircles] = useState([
+    {
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+      size: 20, // Circle size
+      cooldown: 0, // Cooldown timer in seconds
+    },
+  ]);
+  const [applePosition, setApplePosition] = useState({
+    x: Math.floor(Math.random() * window.innerWidth),
+    y: Math.floor(Math.random() * window.innerHeight),
+  });
+  const [isAppleVisible, setIsAppleVisible] = useState(true);
 
-//     // Draw the border
-//     ctx.beginPath();
-//     ctx.rect(0, 0, window.innerWidth, window.innerHeight);
-//     ctx.strokeStyle = "black";
-//     ctx.lineWidth = 5;
-//     ctx.stroke();
-//     ctx.closePath();
+  let animationFrameId;
 
-//     // Draw all circles
-//     circles.forEach((circle) => {
-//       ctx.beginPath();
-//       ctx.arc(circle.x, circle.y, circle.size, 0, Math.PI * 2);
-//       ctx.fillStyle = circle.cooldown > 0 ? "orange" : "blue"; // Orange indicates cooldown
-//       ctx.fill();
-//       ctx.closePath();
+  const drawCircles = (ctx) => {
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-//       // Draw the cooldown text inside the circle
-//       ctx.fillStyle = "white";
-//       ctx.font = "14px Arial";
-//       ctx.textAlign = "center";
-//       ctx.textBaseline = "middle";
-//       ctx.fillText(circle.cooldown.toFixed(1), circle.x, circle.y); // Show cooldown with one decimal place
-//     });
+    // Draw the border
+    ctx.beginPath();
+    ctx.rect(0, 0, window.innerWidth, window.innerHeight);
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.closePath();
 
-//     // Draw the apple if visible
-//     if (isAppleVisible) {
-//       ctx.beginPath();
-//       ctx.arc(applePosition.x, applePosition.y, 10, 0, Math.PI * 2);
-//       ctx.fillStyle = "red";
-//       ctx.fill();
-//       ctx.closePath();
-//     }
-//   };
+    // Draw all circles
+    circles.forEach((circle) => {
+      ctx.beginPath();
+      ctx.arc(circle.x, circle.y, circle.size, 0, Math.PI * 2);
+      ctx.fillStyle = circle.cooldown > 0 ? "orange" : "blue"; // Orange indicates cooldown
+      ctx.fill();
+      ctx.closePath();
 
-//   const updateCooldowns = () => {
-//     setCircles((prevCircles) =>
-//       prevCircles.map((circle) => ({
-//         ...circle,
-//         cooldown: Math.max(0, circle.cooldown - 1 / 60), // Decrease cooldown (1 frame = 1/60 sec)
-//       }))
-//     );
-//   };
+      // Draw the cooldown text inside the circle
+      ctx.fillStyle = "white";
+      ctx.font = "14px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(circle.cooldown.toFixed(1), circle.x, circle.y); // Show cooldown with one decimal place
+    });
 
-//   const moveCirclesTowards = (mouseX, mouseY) => {
-//     setCircles((prevCircles) =>
-//       prevCircles.map((circle, index) => {
-//         const dx = mouseX - circle.x;
-//         const dy = mouseY - circle.y;
-//         const distance = Math.sqrt(dx * dx + dy * dy);
+    // Draw the apple if visible
+    if (isAppleVisible) {
+      ctx.beginPath();
+      ctx.arc(applePosition.x, applePosition.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = "red";
+      ctx.fill();
+      ctx.closePath();
+    }
+  };
 
-//         const maxSpeed = 7;
-//         const minSpeed = 1;
-//         const sizeFactor = 15;
+  const updateCooldowns = () => {
+    setCircles((prevCircles) =>
+      prevCircles.map((circle) => ({
+        ...circle,
+        cooldown: Math.max(0, circle.cooldown - 1 / 60), // Decrease cooldown (1 frame = 1/60 sec)
+      }))
+    );
+  };
 
-//         const sizeBasedSpeed = Math.max(
-//           minSpeed,
-//           maxSpeed - circle.size / sizeFactor
-//         );
-//         const easingFactor = Math.pow(distance, 0.5); // Ease-out based on distance
-//         const speed = Math.min(sizeBasedSpeed, easingFactor);
+  const moveCirclesTowards = (mouseX, mouseY) => {
+    setCircles((prevCircles) =>
+      prevCircles.map((circle, index) => {
+        const dx = mouseX - circle.x;
+        const dy = mouseY - circle.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-//         if (distance < 1) return circle;
+        const maxSpeed = 7;
+        const minSpeed = 1;
+        const sizeFactor = 15;
 
-//         const angle = Math.atan2(dy, dx);
-//         let newX = circle.x + Math.cos(angle) * Math.min(speed, distance);
-//         let newY = circle.y + Math.sin(angle) * Math.min(speed, distance);
+        const sizeBasedSpeed = Math.max(
+          minSpeed,
+          maxSpeed - circle.size / sizeFactor
+        );
+        const easingFactor = Math.pow(distance, 0.5); // Ease-out based on distance
+        const speed = Math.min(sizeBasedSpeed, easingFactor);
 
-//         // Ensure no overlap between circles
-//         prevCircles.forEach((otherCircle, otherIndex) => {
-//           if (index !== otherIndex) {
-//             const dx = newX - otherCircle.x;
-//             const dy = newY - otherCircle.y;
-//             const dist = Math.sqrt(dx * dx + dy * dy);
-//             const minDistance = circle.size + otherCircle.size + 2; // Minimum space between circles
+        if (distance < 1) return circle;
 
-//             // If the circles are too close, move them apart
-//             if (dist < minDistance) {
-//               const angle = Math.atan2(dy, dx);
-//               const offset = minDistance - dist;
+        const angle = Math.atan2(dy, dx);
+        let newX = circle.x + Math.cos(angle) * Math.min(speed, distance);
+        let newY = circle.y + Math.sin(angle) * Math.min(speed, distance);
 
-//               // Push circles apart
-//               newX += (Math.cos(angle) * offset) / 2;
-//               newY += (Math.sin(angle) * offset) / 2;
-//             }
-//           }
-//         });
+        // Ensure no overlap between circles
+        prevCircles.forEach((otherCircle, otherIndex) => {
+          if (index !== otherIndex) {
+            const dx = newX - otherCircle.x;
+            const dy = newY - otherCircle.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = circle.size + otherCircle.size + 2; // Minimum space between circles
 
-//         return {
-//           ...circle,
-//           x: newX,
-//           y: newY,
-//         };
-//       })
-//     );
+            // If the circles are too close, move them apart
+            if (dist < minDistance) {
+              const angle = Math.atan2(dy, dx);
+              const offset = minDistance - dist;
 
-//     checkForMerges();
-//   };
+              // Push circles apart
+              newX += (Math.cos(angle) * offset) / 2;
+              newY += (Math.sin(angle) * offset) / 2;
+            }
+          }
+        });
 
-//   const checkForMerges = () => {
-//     setCircles((prevCircles) => {
-//       const merged = [];
+        return {
+          ...circle,
+          x: newX,
+          y: newY,
+        };
+      })
+    );
 
-//       for (let i = 0; i < prevCircles.length; i++) {
-//         let mergedCircle = prevCircles[i];
+    checkForMerges();
+  };
 
-//         for (let j = i + 1; j < prevCircles.length; j++) {
-//           const circle1 = mergedCircle;
-//           const circle2 = prevCircles[j];
+  const checkForMerges = () => {
+    setCircles((prevCircles) => {
+      const merged = [];
 
-//           const dx = circle2.x - circle1.x;
-//           const dy = circle2.y - circle1.y;
-//           const distance = Math.sqrt(dx * dx + dy * dy);
+      for (let i = 0; i < prevCircles.length; i++) {
+        let mergedCircle = prevCircles[i];
 
-//           // Check if both circles are ready to merge (cooldown must be zero)
-//           if (
-//             distance < circle1.size + circle2.size + 5 && // Added small buffer
-//             circle1.cooldown <= 0 &&
-//             circle2.cooldown <= 0
-//           ) {
-//             // Merge the circles
-//             mergedCircle = {
-//               x: (circle1.x + circle2.x) / 2,
-//               y: (circle1.y + circle2.y) / 2,
-//               size: circle1.size + circle2.size,
-//               cooldown: 0, // Set cooldown to 0 for the new merged circle
-//             };
+        for (let j = i + 1; j < prevCircles.length; j++) {
+          const circle1 = mergedCircle;
+          const circle2 = prevCircles[j];
 
-//             prevCircles.splice(j, 1); // Remove merged circle
-//             break; // Stop checking for further merges once merged
-//           }
-//         }
+          const dx = circle2.x - circle1.x;
+          const dy = circle2.y - circle1.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
 
-//         merged.push(mergedCircle);
-//       }
+          // Check if both circles are ready to merge (cooldown must be zero)
+          if (
+            distance < circle1.size + circle2.size + 5 && // Added small buffer
+            circle1.cooldown <= 0 &&
+            circle2.cooldown <= 0
+          ) {
+            // Merge the circles
+            mergedCircle = {
+              x: (circle1.x + circle2.x) / 2,
+              y: (circle1.y + circle2.y) / 2,
+              size: circle1.size + circle2.size,
+              cooldown: 0, // Set cooldown to 0 for the new merged circle
+            };
 
-//       // Ensure no overlap after merge (check distances)
-//       for (let i = 0; i < merged.length; i++) {
-//         for (let j = i + 1; j < merged.length; j++) {
-//           const dx = merged[j].x - merged[i].x;
-//           const dy = merged[j].y - merged[i].y;
-//           const distance = Math.sqrt(dx * dx + dy * dy);
-//           const minDistance = merged[i].size + merged[j].size + 10; // minimum space between merged circles
+            prevCircles.splice(j, 1); // Remove merged circle
+            break; // Stop checking for further merges once merged
+          }
+        }
 
-//           // If they are too close, push them apart
-//           if (distance < minDistance) {
-//             const angle = Math.atan2(dy, dx);
-//             const offset = minDistance - distance;
+        merged.push(mergedCircle);
+      }
 
-//             merged[j].x += (Math.cos(angle) * offset) / 2;
-//             merged[j].y += (Math.sin(angle) * offset) / 2;
-//             merged[i].x -= (Math.cos(angle) * offset) / 2;
-//             merged[i].y -= (Math.sin(angle) * offset) / 2;
-//           }
-//         }
-//       }
+      // Ensure no overlap after merge (check distances)
+      for (let i = 0; i < merged.length; i++) {
+        for (let j = i + 1; j < merged.length; j++) {
+          const dx = merged[j].x - merged[i].x;
+          const dy = merged[j].y - merged[i].y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const minDistance = merged[i].size + merged[j].size + 10; // minimum space between merged circles
 
-//       return merged;
-//     });
-//   };
+          // If they are too close, push them apart
+          if (distance < minDistance) {
+            const angle = Math.atan2(dy, dx);
+            const offset = minDistance - distance;
 
-//   const detectCollision = () => {
-//     circles.forEach((circle, index) => {
-//       const dx = circle.x - applePosition.x;
-//       const dy = circle.y - applePosition.y;
-//       const distance = Math.sqrt(dx * dx + dy * dy);
+            merged[j].x += (Math.cos(angle) * offset) / 2;
+            merged[j].y += (Math.sin(angle) * offset) / 2;
+            merged[i].x -= (Math.cos(angle) * offset) / 2;
+            merged[i].y -= (Math.sin(angle) * offset) / 2;
+          }
+        }
+      }
 
-//       if (distance < circle.size + 10 && isAppleVisible) {
-//         setIsAppleVisible(false);
+      return merged;
+    });
+  };
 
-//         setCircles((prev) =>
-//           prev.map((c, i) =>
-//             i === index
-//               ? {
-//                   ...c,
-//                   size: c.size + 5,
-//                   // Decrease the cooldown by 4 seconds but ensure it's not less than 0
-//                   cooldown: Math.max(0, c.cooldown - 4),
-//                 }
-//               : c
-//           )
-//         );
+  const detectCollision = () => {
+    circles.forEach((circle, index) => {
+      const dx = circle.x - applePosition.x;
+      const dy = circle.y - applePosition.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-//         setTimeout(() => {
-//           const newApplePosition = {
-//             x: Math.floor(Math.random() * window.innerWidth),
-//             y: Math.floor(Math.random() * window.innerHeight),
-//           };
-//           setApplePosition(newApplePosition);
-//           setIsAppleVisible(true);
-//         }, 500);
-//       }
-//     });
-//   };
+      if (distance < circle.size + 10 && isAppleVisible) {
+        setIsAppleVisible(false);
 
-//   const handleMouseMove = (e) => {
-//     const canvas = canvasRef.current;
-//     const rect = canvas.getBoundingClientRect();
-//     const mouseX = e.clientX - rect.left;
-//     const mouseY = e.clientY - rect.top;
+        setCircles((prev) =>
+          prev.map((c, i) =>
+            i === index
+              ? {
+                  ...c,
+                  size: c.size + 5,
+                  // Decrease the cooldown by 4 seconds but ensure it's not less than 0
+                  cooldown: Math.max(0, c.cooldown - 4),
+                }
+              : c
+          )
+        );
 
-//     const animate = () => {
-//       moveCirclesTowards(mouseX, mouseY);
-//       animationFrameId = requestAnimationFrame(animate);
-//     };
-//     cancelAnimationFrame(animationFrameId);
-//     animationFrameId = requestAnimationFrame(animate);
-//   };
+        setTimeout(() => {
+          const newApplePosition = {
+            x: Math.floor(Math.random() * window.innerWidth),
+            y: Math.floor(Math.random() * window.innerHeight),
+          };
+          setApplePosition(newApplePosition);
+          setIsAppleVisible(true);
+        }, 500);
+      }
+    });
+  };
 
-//   const handleKeyPress = (e) => {
-//     if (e.code === "Space") {
-//       setCircles((prevCircles) =>
-//         prevCircles.flatMap((circle) => {
-//           const halfSize = circle.size / 2;
-//           const offset = circle.size + 15;
-//           if (halfSize < 5) return [circle];
+  const handleMouseMove = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-//           // Ensure split circles don't overlap by using dynamic offset
-//           const splitOffset = offset * 1.5;
+    const animate = () => {
+      moveCirclesTowards(mouseX, mouseY);
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = requestAnimationFrame(animate);
+  };
 
-//           return [
-//             {
-//               ...circle,
-//               size: halfSize,
-//               x: circle.x - splitOffset,
-//               y: circle.y - splitOffset,
-//               cooldown: Math.max(10, 30 + 0.02 * halfSize), // Ensure cooldown is at least 10 sec
-//             },
-//             {
-//               ...circle,
-//               size: halfSize,
-//               x: circle.x + splitOffset,
-//               y: circle.y + splitOffset,
-//               cooldown: Math.max(10, 30 + 0.02 * halfSize), // Ensure cooldown is at least 10 sec
-//             },
-//           ];
-//         })
-//       );
-//     }
-//   };
+  const handleKeyPress = (e) => {
+    if (e.code === "Space") {
+      setCircles((prevCircles) =>
+        prevCircles.flatMap((circle) => {
+          const halfSize = circle.size / 2;
+          const offset = circle.size + 15;
+          if (halfSize < 5) return [circle];
 
-//   useEffect(() => {
-//     const canvas = canvasRef.current;
-//     const ctx = canvas.getContext("2d");
-//     canvas.width = window.innerWidth;
-//     canvas.height = window.innerHeight;
+          // Ensure split circles don't overlap by using dynamic offset
+          const splitOffset = offset * 1.5;
 
-//     const render = () => {
-//       drawCircles(ctx);
-//       updateCooldowns();
-//       detectCollision();
-//       animationFrameId = requestAnimationFrame(render);
-//     };
-//     render();
+          return [
+            {
+              ...circle,
+              size: halfSize,
+              x: circle.x - splitOffset,
+              y: circle.y - splitOffset,
+              cooldown: Math.max(10, 30 + 0.02 * halfSize), // Ensure cooldown is at least 10 sec
+            },
+            {
+              ...circle,
+              size: halfSize,
+              x: circle.x + splitOffset,
+              y: circle.y + splitOffset,
+              cooldown: Math.max(10, 30 + 0.02 * halfSize), // Ensure cooldown is at least 10 sec
+            },
+          ];
+        })
+      );
+    }
+  };
 
-//     return () => cancelAnimationFrame(animationFrameId);
-//   }, [circles, applePosition, isAppleVisible]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-//   useEffect(() => {
-//     const canvas = canvasRef.current;
-//     canvas.addEventListener("mousemove", handleMouseMove);
-//     window.addEventListener("keydown", handleKeyPress);
+    const render = () => {
+      drawCircles(ctx);
+      updateCooldowns();
+      detectCollision();
+      animationFrameId = requestAnimationFrame(render);
+    };
+    render();
 
-//     return () => {
-//       canvas.removeEventListener("mousemove", handleMouseMove);
-//       window.removeEventListener("keydown", handleKeyPress);
-//     };
-//   }, []);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [circles, applePosition, isAppleVisible]);
 
-//   return <canvas ref={canvasRef} style={{ display: "block" }} />;
-// };
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    canvas.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("keydown", handleKeyPress);
 
-// export default CircleCanvasTwo;
+    return () => {
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("keydown", handleKeyPress);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} style={{ display: "block" }} />;
+};
+
+export default CircleCanvasTwo;
