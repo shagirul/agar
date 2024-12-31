@@ -12,14 +12,23 @@ const SocketEvents = Object.freeze({
   PlayerDisconnected: "playerDisconnected",
 });
 
+// Connect to the Socket.IO server
 const socket = io("http://localhost:3000");
 
 const Game = () => {
-  const canvasRef = useRef(null);
-  const [players, setPlayers] = useState([]);
-  const [currentPlayer, setCurrentPlayer] = useState(null);
-  const [apples, setApples] = useState([]);
-  const lastSentPositionRef = useRef({ x: 0, y: 0 });
+  const canvasRef = useRef(null); // Reference to the canvas element
+  const [players, setPlayers] = useState([]); // State to hold player data
+  const [currentPlayer, setCurrentPlayer] = useState(null); // State for the current player
+  const [apples, setApples] = useState([]); // State for apple positions
+  const [translate, setTranslate] = useState({ x: 0, y: 0 }); // Current canvas translation
+  const [isMoving, setIsMoving] = useState({
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+  }); // Tracks directional movement
+  const moveSpeed = 2; // Speed for translating the canvas
+  const boundaryOffset = 200; // Distance from the canvas edges to trigger movement
 
   // Socket event listeners
   useEffect(() => {
@@ -42,8 +51,10 @@ const Game = () => {
     socket.on(SocketEvents.PlayerCreated, handlePlayerCreated);
     socket.on(SocketEvents.PlayerDisconnected, handlePlayerDisconnected);
 
+    // Notify the server to create a new player
     socket.emit(SocketEvents.CreatePlayer, "shaggy");
 
+    // Clean up on unload
     const handleBeforeUnload = () => {
       socket.emit(SocketEvents.PlayerDisconnected);
       socket.disconnect();
@@ -58,62 +69,77 @@ const Game = () => {
     };
   }, [currentPlayer]);
 
-  // Handle player movement
-  // const movePlayer = throttle((e) => {
-  //   if (!currentPlayer) return;
+  // Handle mouse movement for canvas translation
+  const handleMouseMove = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  //   const canvas = canvasRef.current;
-  //   if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-  //   const rect = canvas.getBoundingClientRect();
-  //   const mouseX = e.clientX - rect.left - canvas.width / 2;
-  //   const mouseY = e.clientY - rect.top - canvas.height / 2;
+    // Determine if the mouse is near the edges of the canvas
+    const moveUp = mouseY < boundaryOffset;
+    const moveDown = mouseY > canvas.height - boundaryOffset;
+    const moveLeft = mouseX < boundaryOffset;
+    const moveRight = mouseX > canvas.width - boundaryOffset;
 
-  //   const speed = 2; // Adjust speed
-  //   const predictedX = currentPlayer.x + mouseX * 0.01 * speed;
-  //   const predictedY = currentPlayer.y + mouseY * 0.01 * speed;
+    setIsMoving({
+      up: moveUp,
+      down: moveDown,
+      left: moveLeft,
+      right: moveRight,
+    });
+  };
 
-  //   const { x: lastX, y: lastY } = lastSentPositionRef.current;
+  // Update canvas translation at regular intervals
+  useEffect(() => {
+    const moveCanvas = () => {
+      setTranslate((prev) => ({
+        x:
+          prev.x +
+          (isMoving.right ? moveSpeed : isMoving.left ? -moveSpeed : 0),
+        y: prev.y + (isMoving.down ? moveSpeed : isMoving.up ? -moveSpeed : 0),
+      }));
+    };
 
-  //   // Update only if there's significant movement
-  //   if (Math.abs(predictedX - lastX) > 1 || Math.abs(predictedY - lastY) > 1) {
-  //     setCurrentPlayer((prev) => ({ ...prev, x: predictedX, y: predictedY }));
-  //     lastSentPositionRef.current = { x: predictedX, y: predictedY };
-  //     socket.emit(SocketEvents.UpdatePlayerPosition, predictedX, predictedY);
-  //   }
-  // }, 100); // Throttle to 500ms
+    const interval = setInterval(moveCanvas, 16); // 60 FPS
+    return () => clearInterval(interval);
+  }, [isMoving]);
+
+  // Send player position updates to the server
   const movePlayer = throttle((e) => {
     if (!currentPlayer) return;
+
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left; // Mouse position relative to canvas
     const mouseY = e.clientY - rect.top;
 
-    // Send raw mouse position directly to the server
-    const target = { x: mouseX, y: mouseY };
-    socket.emit(SocketEvents.UpdatePlayerPosition, target);
+    // Convert to global game coordinates by adjusting for canvas translation
+    const globalMouseX = mouseX + translate.x;
+    const globalMouseY = mouseY + translate.y;
 
-    console.log("Raw mouse position sent:", target);
+    // Send the adjusted position to the server
+    const target = { x: globalMouseX, y: globalMouseY };
+    socket.emit(SocketEvents.UpdatePlayerPosition, target);
   }, 100); // Throttle to 100ms
 
-  // Render the canvas
+  // Render the game canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
     let animationFrameId;
+
     const render = () => {
       if (!currentPlayer) return;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Calculate viewport
-      const viewportX = currentPlayer.x - canvas.width / 2;
-      const viewportY = currentPlayer.y - canvas.height / 2;
-
       ctx.save();
-      ctx.translate(-viewportX, -viewportY);
+      ctx.translate(-translate.x, -translate.y); // Apply canvas translation
 
       // Draw players
       players.forEach((player) => {
@@ -128,22 +154,13 @@ const Game = () => {
                 0,
                 Math.PI * 2
               );
-              ctx.fillStyle = player.color || "blue"; // Use the player's color for the cell
+              ctx.fillStyle = player.color || "blue"; // Default to blue if no color
               ctx.fill();
               ctx.closePath();
             }
           });
         }
       });
-      // players.forEach((player) => {
-      //   if (player.cells) {
-      //     ctx.beginPath();
-      //     ctx.arc(player.x, player.y, player.size || 10, 0, Math.PI * 2);
-      //     ctx.fillStyle = player.color || "blue";
-      //     ctx.fill();
-      //     ctx.closePath();
-      //   }
-      // });
 
       // Draw apples
       apples.forEach((apple) => {
@@ -162,23 +179,25 @@ const Game = () => {
         }
       });
 
-      ctx.restore();
+      ctx.restore(); // Restore canvas state
       animationFrameId = requestAnimationFrame(render);
-      // requestAnimationFrame(render);
     };
 
     render();
     return () => {
-      cancelAnimationFrame(animationFrameId); // Cleanup on unmount or dependency change
+      cancelAnimationFrame(animationFrameId); // Cleanup on unmount
     };
-  }, [currentPlayer, players, apples]);
+  }, [translate, currentPlayer, players, apples]);
 
   return (
     <canvas
       ref={canvasRef}
       width={1000}
       height={1000}
-      onMouseMove={movePlayer}
+      onMouseMove={(e) => {
+        handleMouseMove(e);
+        movePlayer(e);
+      }}
       style={{ display: "block", margin: "auto", border: "1px solid black" }}
     />
   );
