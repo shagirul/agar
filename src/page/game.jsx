@@ -56,32 +56,45 @@ const Game = () => {
       socket.off(SocketEvents.PlayerDisconnected, handlePlayerDisconnected);
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, []);
+  }, [currentPlayer]);
 
   // Handle player movement
+  // const movePlayer = throttle((e) => {
+  //   if (!currentPlayer) return;
+
+  //   const canvas = canvasRef.current;
+  //   if (!canvas) return;
+
+  //   const rect = canvas.getBoundingClientRect();
+  //   const mouseX = e.clientX - rect.left - canvas.width / 2;
+  //   const mouseY = e.clientY - rect.top - canvas.height / 2;
+
+  //   const speed = 2; // Adjust speed
+  //   const predictedX = currentPlayer.x + mouseX * 0.01 * speed;
+  //   const predictedY = currentPlayer.y + mouseY * 0.01 * speed;
+
+  //   const { x: lastX, y: lastY } = lastSentPositionRef.current;
+
+  //   // Update only if there's significant movement
+  //   if (Math.abs(predictedX - lastX) > 1 || Math.abs(predictedY - lastY) > 1) {
+  //     setCurrentPlayer((prev) => ({ ...prev, x: predictedX, y: predictedY }));
+  //     lastSentPositionRef.current = { x: predictedX, y: predictedY };
+  //     socket.emit(SocketEvents.UpdatePlayerPosition, predictedX, predictedY);
+  //   }
+  // }, 100); // Throttle to 500ms
   const movePlayer = throttle((e) => {
     if (!currentPlayer) return;
-
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left - canvas.width / 2;
-    const mouseY = e.clientY - rect.top - canvas.height / 2;
+    const mouseX = e.clientX - rect.left; // Mouse position relative to canvas
+    const mouseY = e.clientY - rect.top;
 
-    const speed = 2; // Adjust speed
-    const predictedX = currentPlayer.x + mouseX * 0.01 * speed;
-    const predictedY = currentPlayer.y + mouseY * 0.01 * speed;
+    // Send raw mouse position directly to the server
+    const target = { x: mouseX, y: mouseY };
+    socket.emit(SocketEvents.UpdatePlayerPosition, target);
 
-    const { x: lastX, y: lastY } = lastSentPositionRef.current;
-
-    // Update only if there's significant movement
-    if (Math.abs(predictedX - lastX) > 1 || Math.abs(predictedY - lastY) > 1) {
-      setCurrentPlayer((prev) => ({ ...prev, x: predictedX, y: predictedY }));
-      lastSentPositionRef.current = { x: predictedX, y: predictedY };
-      socket.emit(SocketEvents.UpdatePlayerPosition, predictedX, predictedY);
-    }
-  }, 100); // Throttle to 500ms
+    console.log("Raw mouse position sent:", target);
+  }, 100); // Throttle to 100ms
 
   // Render the canvas
   useEffect(() => {
@@ -104,20 +117,45 @@ const Game = () => {
 
       // Draw players
       players.forEach((player) => {
-        if (player.x && player.y) {
-          ctx.beginPath();
-          ctx.arc(player.x, player.y, player.size || 10, 0, Math.PI * 2);
-          ctx.fillStyle = player.color || "blue";
-          ctx.fill();
-          ctx.closePath();
+        if (player.cells && player.cells.length > 0) {
+          player.cells.forEach((cell) => {
+            if (cell.position && cell.size) {
+              ctx.beginPath();
+              ctx.arc(
+                cell.position.x,
+                cell.position.y,
+                cell.size,
+                0,
+                Math.PI * 2
+              );
+              ctx.fillStyle = player.color || "blue"; // Use the player's color for the cell
+              ctx.fill();
+              ctx.closePath();
+            }
+          });
         }
       });
+      // players.forEach((player) => {
+      //   if (player.cells) {
+      //     ctx.beginPath();
+      //     ctx.arc(player.x, player.y, player.size || 10, 0, Math.PI * 2);
+      //     ctx.fillStyle = player.color || "blue";
+      //     ctx.fill();
+      //     ctx.closePath();
+      //   }
+      // });
 
       // Draw apples
       apples.forEach((apple) => {
-        if (apple.x && apple.y && apple.size) {
+        if (apple.position && apple.size) {
           ctx.beginPath();
-          ctx.arc(apple.x, apple.y, apple.size, 0, Math.PI * 2);
+          ctx.arc(
+            apple.position.x,
+            apple.position.y,
+            apple.size,
+            0,
+            Math.PI * 2
+          );
           ctx.fillStyle = "red";
           ctx.fill();
           ctx.closePath();
